@@ -1,0 +1,42 @@
+trigger:
+- master
+
+pool:
+ VMImage: Ubuntu-latest
+
+variables: 
+  - Group: "SECURE TOKEN"
+  - name: "snyk_token"
+    value: $[variable.SNYKTOKEN]
+  - name: "sonar_token"
+    value: $[variable.SONARTOKEN]
+
+
+steps:
+
+- script: |
+    mvn verify package
+      sonar:sonar
+      -Dsonar.hostURL= https://sonarcloud.io/
+      -Dsonar.organization=testdevsecopsorg
+      -Dsonar.projectKey=
+      -Dsonar.login= $(sonar_token)
+  displayName: "prepare SAST SonarCloud Verify"
+
+- script: |
+      SNYK-TOKEN = $(snyk_token)
+      EXPORT SNYK = SNYK-TOKEN
+      mvn snyk = test -fn
+  displayName: "Integrate SCA Scan in ADO Pipelines"
+
+- script: |
+      wget https://github.com/zaproxy/zaproxy/releases/download/v2.11.1/ZAP_2.11.1_Linux.tar.gz
+      tar -xvf ZAP_2.11.1_Linux.tar.gz
+      cd ZAP_2.11.1
+      ./zap.sh -cmd -quickurl https://www.example.com -quickprogress -quickout /home/vsts/work/1/a/zap_report.html
+  displayName: "DAST Tool analysis using OWASPZAP tool"
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: zap_report.html
